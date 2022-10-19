@@ -36,7 +36,7 @@ AMainCharacter::AMainCharacter()
 	// Create camera for 1st person view
 	CameraComponent1P = CreateDefaultSubobject<UCameraComponent>(TEXT("CameraComp1P"));
 	CameraComponent1P->SetupAttachment(GetMesh(), FName(TEXT("head")));
-	CameraComponent1P->SetRelativeLocation(FVector(10.f, 20.f, 0.f));
+	CameraComponent1P->SetRelativeLocation(FVector(0.f, 20.f, 0.f));
 	CameraComponent1P->SetRelativeRotation(FRotator(0.f, 90.f, -90.f));
 	CameraComponent1P->SetAutoActivate(true);
 	CameraComponent1P->bUsePawnControlRotation = true;
