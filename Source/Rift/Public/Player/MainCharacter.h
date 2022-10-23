@@ -20,37 +20,51 @@ public:
 
 	// Base turn rate, in deg/sec. Other scaling may affect final turn rate.
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera)
-		float BaseTurnRate;
+	float BaseTurnRate;
 
 	// Base look up/down rate, in deg/sec. Other scaling may affect final rate.
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera)
-		float BaseLookUpRate;
+	float BaseLookUpRate;
 
 	// Make camera rotation correct
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = Camera)
-		USpringArmComponent* SpringArmComponent;
+	USpringArmComponent* SpringArmComponent;
 
 	// Camera for 3rd person view
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = Camera)
-		UCameraComponent* CameraComponent3P;
+	UCameraComponent* CameraComponent3P;
 
 	// Camera for 1st person view
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = Camera)
-		UCameraComponent* CameraComponent1P;
+	UCameraComponent* CameraComponent1P;
+
+	// Function for activating running animation
+	UFUNCTION(BlueprintCallable, Category = Movement)
+	bool IsRunning() const;
 
 	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
-protected:
+	float GetHealth() const { return Health; }
 
+protected:
 	// Settings function to change hold/toggle crouch
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Control)
-		bool CrouchHold;
+	bool CrouchHold;
 
+	// Health by default
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category=Health)
+	float DefaultHealth = 100.f;
+	
+private:
 	// Functions for movement
 	void MoveForward(float Value);
 	void MoveRight(float Value);
 
+	// Functions for running
+	void OnStartRunning();
+	void OnStopRunning();
+	
 	// Functions for camera rotation
 	void TurnAtRate(float Rate);
 	void LookUpAtRate(float Rate);
@@ -59,13 +73,36 @@ protected:
 	void StartCrouch();
 	void StopCrouch();
 
-	// Functions for toggle crouch
+	// Function for toggle crouch
 	void ToggleCrouch();
-	bool IsCrouching;
-
+	
 	// Function for changing view
 	void ToggleCameraView();
 
+	// Take damage to actor
+	virtual float TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator,
+	                         AActor* DamageCauser) override;
+
+	// Variables for activating running
+	bool WantsToRun;
+	bool IsMovingForward;
+
+	// Speed settings
+	UPROPERTY(EditDefaultsOnly, Category=Speed)
+	float MaxSpeedWalk = 400.f;
+	
+	UPROPERTY(EditDefaultsOnly, Category=Speed)
+	float MaxSpeedCrouch = 200.f;
+	
+	UPROPERTY(EditDefaultsOnly, Category=Speed)
+	float MaxSpeedRun = 600.f;
+	
+    // Variable for toggle crouch mode
+    bool IsCrouching;
+
+	// Current health
+	float Health = 0.f;
+	
 	// Flag for current view mode
-	bool bIsThirdPerson;
+    bool bIsThirdPerson;
 };

@@ -10,7 +10,7 @@
 // Sets default values
 AMainCharacter::AMainCharacter()
 {
- 	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
+	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = false;
 
 	// Set our turn rates for input
@@ -42,12 +42,14 @@ AMainCharacter::AMainCharacter()
 	CameraComponent1P->bUsePawnControlRotation = true;
 
 	// Change default movement parameters
-	GetCharacterMovement()->MaxWalkSpeed = 400;
-	GetCharacterMovement()->MaxWalkSpeedCrouched = 200;
+	GetCharacterMovement()->MaxWalkSpeed = MaxSpeedWalk;
+	GetCharacterMovement()->MaxWalkSpeedCrouched = MaxSpeedCrouch;
 	CrouchHold = true;
 	IsCrouching = false;
-}
 
+	// On the beginning our character has default amount of health
+	Health = DefaultHealth;
+}
 
 // Called to bind functionality to input
 void AMainCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -58,6 +60,10 @@ void AMainCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
 	PlayerInputComponent->BindAxis("MoveForward", this, &AMainCharacter::MoveForward);
 	PlayerInputComponent->BindAxis("MoveRight", this, &AMainCharacter::MoveRight);
 
+	// Bind running
+	PlayerInputComponent->BindAction("Run", IE_Pressed, this, &AMainCharacter::OnStartRunning);
+	PlayerInputComponent->BindAction("Run", IE_Released, this, &AMainCharacter::OnStopRunning);
+
 	// Bind view rotation for mouse
 	PlayerInputComponent->BindAxis("Turn", this, &APawn::AddControllerYawInput);
 	PlayerInputComponent->BindAxis("LookUp", this, &APawn::AddControllerPitchInput);
@@ -66,6 +72,7 @@ void AMainCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
 	PlayerInputComponent->BindAxis("TurnRate", this, &AMainCharacter::TurnAtRate);
 	PlayerInputComponent->BindAxis("LookUpRate", this, &AMainCharacter::LookUpAtRate);
 
+	// CURRENTLY DISABLED
 	// Bind for camera switch
 	PlayerInputComponent->BindAction("ToggleCameraView", IE_Pressed, this, &AMainCharacter::ToggleCameraView);
 
@@ -90,6 +97,7 @@ void AMainCharacter::MoveForward(float Value)
 	if (Value == 0.f) return;
 	// Add movement in that direction
 	AddMovementInput(GetActorForwardVector(), Value);
+	IsMovingForward = Value > 0.f;
 }
 
 void AMainCharacter::MoveRight(float Value)
@@ -97,6 +105,45 @@ void AMainCharacter::MoveRight(float Value)
 	if (Value == 0.f) return;
 	// Add movement in that direction
 	AddMovementInput(GetActorRightVector(), Value);
+}
+
+void AMainCharacter::OnStartRunning()
+{
+	// Turn flag to true
+	WantsToRun = true;
+	// Change max speed
+	if (IsMovingForward)
+	{
+		GetCharacterMovement()->MaxWalkSpeed = MaxSpeedRun;
+	}
+}
+
+void AMainCharacter::OnStopRunning()
+{
+	// Turn flag to false
+	WantsToRun = false;
+	// Return default max speed
+	GetCharacterMovement()->MaxWalkSpeed = MaxSpeedWalk;
+}
+
+bool AMainCharacter::IsRunning() const
+{
+	return WantsToRun && IsMovingForward && !GetVelocity().IsZero();
+}
+
+
+float AMainCharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator,
+                                 AActor* DamageCauser)
+{
+	Health -= DamageAmount;
+	UE_LOG(LogTemp, Display, TEXT("Health: %f"), Health);
+
+	if (Health <= 0)
+	{
+		UE_LOG(LogTemp, Display, TEXT("DEATH!"));
+	}
+
+	return DamageAmount;
 }
 
 // Functions for hold crouch
@@ -113,14 +160,17 @@ void AMainCharacter::StopCrouch()
 // Functions for toggle crouch
 void AMainCharacter::ToggleCrouch()
 {
+	// If we currently crouch and press the key - stand up
 	if (IsCrouching)
 	{
 		ACharacter::UnCrouch();
 	}
+	// Is we don't crouch and press key - we start crouching
 	else
 	{
 		ACharacter::Crouch();
 	}
+	// Toggle crouching flag
 	IsCrouching = !IsCrouching;
 }
 
