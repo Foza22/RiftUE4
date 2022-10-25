@@ -3,9 +3,12 @@
 
 #include "Player/MainCharacter.h"
 #include "Camera/CameraComponent.h"
+#include "Components/CapsuleComponent.h"
 #include "Components/InputComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Kismet/GameplayStatics.h"
 #include "GameFramework/SpringArmComponent.h"
+#include "Interactions/Door.h"
 
 // Sets default values
 AMainCharacter::AMainCharacter()
@@ -36,7 +39,7 @@ AMainCharacter::AMainCharacter()
 	// Create camera for 1st person view
 	CameraComponent1P = CreateDefaultSubobject<UCameraComponent>(TEXT("CameraComp1P"));
 	CameraComponent1P->SetupAttachment(GetMesh(), FName(TEXT("head")));
-	CameraComponent1P->SetRelativeLocation(FVector(0.f, 20.f, 0.f));
+	CameraComponent1P->SetRelativeLocation(FVector(0.f, 10.f, 0.f));
 	CameraComponent1P->SetRelativeRotation(FRotator(0.f, 90.f, -90.f));
 	CameraComponent1P->SetAutoActivate(true);
 	CameraComponent1P->bUsePawnControlRotation = true;
@@ -49,6 +52,9 @@ AMainCharacter::AMainCharacter()
 
 	// On the beginning our character has default amount of health
 	Health = DefaultHealth;
+
+	GetCapsuleComponent()->OnComponentBeginOverlap.AddDynamic(this, &AMainCharacter::OnOverlapBegin);
+	GetCapsuleComponent()->OnComponentEndOverlap.AddDynamic(this, &AMainCharacter::OnOverlapEnd);
 }
 
 // Called to bind functionality to input
@@ -76,6 +82,9 @@ void AMainCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
 	// Bind for camera switch
 	PlayerInputComponent->BindAction("ToggleCameraView", IE_Pressed, this, &AMainCharacter::ToggleCameraView);
 
+	// Bind for interaction with world
+	PlayerInputComponent->BindAction("Interact", IE_Pressed, this, &AMainCharacter::Interact);
+
 	// Bind jump event
 	PlayerInputComponent->BindAction("Jump", IE_Pressed, this, &ACharacter::Jump);
 	PlayerInputComponent->BindAction("Jump", IE_Released, this, &ACharacter::StopJumping);
@@ -89,6 +98,42 @@ void AMainCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
 	else
 	{
 		PlayerInputComponent->BindAction("Crouch", IE_Pressed, this, &AMainCharacter::ToggleCrouch);
+	}
+}
+
+void AMainCharacter::Interact()
+{
+	// If we can get current door - we interact with it
+	if (CurrentDoor)
+	{
+		FVector ForwardVector = GetCapsuleComponent()->GetForwardVector();
+		CurrentDoor->ToggleDoor(ForwardVector);
+	}
+}
+
+void AMainCharacter::OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
+                                    UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep,
+                                    const FHitResult& SweepResult)
+{
+	// If we overlap door access radius - save it like current door
+	if (OtherActor != nullptr && OtherActor != this && OtherComp != nullptr && OtherActor->GetClass()->IsChildOf(
+		ADoor::StaticClass()))
+	{
+		// if(GEngine) GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Yellow, TEXT("Came to door!"));
+
+		CurrentDoor = Cast<ADoor>(OtherActor);
+	}
+}
+
+void AMainCharacter::OnOverlapEnd(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
+                                  UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
+{
+	// On quiting access radius - delete current door 
+	if (OtherActor != nullptr && OtherActor != this && OtherComp != nullptr)
+	{
+		// if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Yellow, TEXT("Came from door!"));
+
+		CurrentDoor = nullptr;
 	}
 }
 
