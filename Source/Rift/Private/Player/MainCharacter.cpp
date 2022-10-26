@@ -25,8 +25,9 @@ AMainCharacter::AMainCharacter()
 	SpringArmComponent->SetupAttachment(RootComponent);
 	SpringArmComponent->SetRelativeRotation(FRotator(0.f, 90.f, 0.f));
 	SpringArmComponent->SetRelativeLocation(FVector(10.f, 0.f, 70.f));
-	SpringArmComponent->TargetArmLength = 350;
+	SpringArmComponent->TargetArmLength = 250;
 	SpringArmComponent->SocketOffset.Z = 50.0f;
+	SpringArmComponent->SocketOffset.Y = 30.0f;
 	SpringArmComponent->bUsePawnControlRotation = true;
 	bIsThirdPerson = false;
 
@@ -194,11 +195,13 @@ float AMainCharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageE
 // Functions for hold crouch
 void AMainCharacter::StartCrouch()
 {
+	UE_LOG(LogTemp, Display, TEXT("CROUCH"));
 	ACharacter::Crouch();
 }
 
 void AMainCharacter::StopCrouch()
 {
+	UE_LOG(LogTemp, Display, TEXT("UNCROUCH"));
 	ACharacter::UnCrouch();
 }
 

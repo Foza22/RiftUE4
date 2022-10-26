@@ -29,7 +29,7 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera)
 	float BaseLookUpRate;
 
-	// Make camera rotation correct
+	// Make camera offset
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = Camera)
 	USpringArmComponent* SpringArmComponent;
 
