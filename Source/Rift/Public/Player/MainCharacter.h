@@ -11,6 +11,7 @@ class USpringArmComponent;
 class UCapsuleComponent;
 class UBoxComponent;
 class ADoor;
+class ABaseVehicle;
 
 UCLASS()
 class RIFT_API AMainCharacter : public ACharacter
@@ -41,14 +42,6 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = Camera)
 	UCameraComponent* CameraComponent1P;
 
-	// Function for activating running animation
-	UFUNCTION(BlueprintCallable, Category = Movement)
-	bool IsRunning() const;
-
-	// Health function for UI
-	UFUNCTION(BlueprintCallable, Category = Health)
-	float GetHealth() const { return Health; }
-	
 	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
@@ -62,6 +55,19 @@ public:
 	void OnOverlapEnd(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
 	                  UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
 
+	// Function for activating running animation
+	UFUNCTION(BlueprintCallable, Category = Movement)
+	bool IsRunning() const;
+
+	// Health function for UI
+	UFUNCTION(BlueprintCallable, Category = Health)
+	float GetHealth() const { return Health; }
+
+	// Functions for Driving Animations
+	void SetIsDriving(bool Condition) { IsDriving = Condition; }
+	UFUNCTION(BlueprintCallable, Category = Driving)
+	bool GetIsDriving() const { return IsDriving; }
+
 protected:
 	// Settings function to change hold/toggle crouch
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Control)
@@ -74,11 +80,18 @@ protected:
 private:
 	// Hold current overlapped door
 	UPROPERTY()
-	ADoor* CurrentDoor;
+	ADoor* CurrentDoor = nullptr;
+
+	// Hold current overlapped car
+	UPROPERTY()
+	ABaseVehicle* CurrentVehicle = nullptr;
 
 	// Interact with door
 	void Interact();
 
+	// Function called on Interact with car
+	void GetToVehicle();
+	
 	// Functions for movement
 	void MoveForward(float Value);
 	void MoveRight(float Value);
@@ -107,8 +120,11 @@ private:
 
 
 	// Variables for activating running
-	bool WantsToRun;
-	bool IsMovingForward;
+	bool WantsToRun = false;
+	bool IsMovingForward = false;
+
+	// Variable for driving animation
+	bool IsDriving = false;
 
 	// Speed settings
 	UPROPERTY(EditDefaultsOnly, Category=Speed)
@@ -121,11 +137,11 @@ private:
 	float MaxSpeedRun = 600.f;
 
 	// Variable for toggle crouch mode
-	bool IsCrouching;
+	bool IsCrouching = false;
 
 	// Current health
 	float Health = 0.f;
 
 	// Flag for current view mode
-	bool bIsThirdPerson;
+	bool bIsThirdPerson = false;
 };

@@ -4,6 +4,7 @@
 #include "Vehicles/SUV.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "WheeledVehicleMovementComponent4W.h"
+#include "Components/BoxComponent.h"
 
 ASUV::ASUV()
 {
@@ -24,4 +25,7 @@ ASUV::ASUV()
 
 	Vehicle4W->ChassisWidth = 130.f;
 	Vehicle4W->ChassisHeight = 30.f;
+
+	InteractCollision->InitBoxExtent(FVector(60.f,120.f,75.f));
+	InteractCollision->SetRelativeLocation(FVector(25.f,0.f,100.f));
 }

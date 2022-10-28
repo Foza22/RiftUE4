@@ -4,6 +4,7 @@
 #include "Vehicles/PickupCar.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "WheeledVehicleMovementComponent4W.h"
+#include "Components/BoxComponent.h"
 
 APickupCar::APickupCar()
 {
@@ -24,5 +25,8 @@ APickupCar::APickupCar()
 
 	Vehicle4W->ChassisWidth = 130.f;
 	Vehicle4W->ChassisHeight = 30.f;
+
+	InteractCollision->InitBoxExtent(FVector(60.f,120.f,65.f));
+	InteractCollision->SetRelativeLocation(FVector(40.f,0.f,85.f));
 }
 

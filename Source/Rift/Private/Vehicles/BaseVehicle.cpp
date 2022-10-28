@@ -6,6 +6,10 @@
 #include "Camera/CameraComponent.h"
 #include "Components/InputComponent.h"
 #include "WheeledVehicleMovementComponent4W.h"
+#include "AnimNodes/AnimNode_RandomPlayer.h"
+#include "Components/BoxComponent.h"
+#include "Components/CapsuleComponent.h"
+#include "Player/MainCharacter.h"
 
 ABaseVehicle::ABaseVehicle()
 {
@@ -46,20 +50,29 @@ ABaseVehicle::ABaseVehicle()
 	Vehicle4W->ChassisWidth = 140.f;
 	Vehicle4W->ChassisHeight = 23.f;
 	
-	GetMesh()->SetWorldScale3D(FVector(1.1f,1.1f,1.1f));	
+	GetMesh()->SetWorldScale3D(FVector(1.2f,1.2f,1.2f));	
 	
 	// Create spring arm component
 	SpringArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArm"));
 	SpringArm->SetupAttachment(RootComponent);
-	SpringArm->SetRelativeLocation(FVector(-100.f,0.f,105.f));
-	SpringArm->TargetArmLength = 450.f;
-	SpringArm->SocketOffset.Z = 50.f;
+	SpringArm->SetRelativeLocation(FVector(0.f,0.f,0.f));
+	SpringArm->TargetArmLength = 3000.f;
+	SpringArm->SocketOffset.Z = 0.f;
 	SpringArm->bUsePawnControlRotation = true;
 
 	// Create camera component
 	Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
 	Camera->SetupAttachment(SpringArm, USpringArmComponent::SocketName);
 	Camera->FieldOfView = 90.f;
+
+	// Create collision for interacting with car
+	InteractCollision = CreateDefaultSubobject<UBoxComponent>(TEXT("InteractCollision"));
+	InteractCollision->SetupAttachment(RootComponent);
+	InteractCollision->InitBoxExtent(FVector(200.f,200.f,200.f));
+	InteractCollision->SetRelativeLocation(FVector(0.f,0.f,70.f));
+
+	InteractCollision->OnComponentBeginOverlap.AddDynamic(this, &ABaseVehicle::OnOverlapBegin);
+	InteractCollision->OnComponentEndOverlap.AddDynamic(this, &ABaseVehicle::OnOverlapEnd);
 }
 
 void ABaseVehicle::Tick(float DeltaTime)
@@ -84,6 +97,31 @@ void ABaseVehicle::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 	// Bind handbrake
 	PlayerInputComponent->BindAction("Handbrake", IE_Pressed, this, &ABaseVehicle::OnHandbreakPressed);
 	PlayerInputComponent->BindAction("Handbrake", IE_Released, this, &ABaseVehicle::OnHandbreakReleased);
+
+	// Bind interaction with car
+	PlayerInputComponent->BindAction("Interact", IE_Pressed, this, &ABaseVehicle::LeaveVehicle);
+}
+
+void ABaseVehicle::OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+	if (OtherActor != nullptr && OtherActor != this && OtherComp != nullptr && OtherActor->GetClass()->IsChildOf(
+		AMainCharacter::StaticClass()))
+	{
+		if(GEngine) GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Yellow, TEXT("Someone went to car!"));
+
+		CurrentCharacter = Cast<AMainCharacter>(OtherActor);
+	}
+}
+
+void ABaseVehicle::OnOverlapEnd(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
+{
+	// On quiting access radius - delete current character 
+	if (OtherActor != nullptr && OtherActor != this && OtherComp != nullptr)
+	{
+		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Yellow, TEXT("Someone went from car"));
+
+		CurrentCharacter = nullptr;
+	}
 }
 
 void ABaseVehicle::MoveForward(float Value)
@@ -118,6 +156,19 @@ void ABaseVehicle::OnHandbreakPressed()
 void ABaseVehicle::OnHandbreakReleased()
 {
 	GetVehicleMovementComponent()->SetHandbrakeInput(false);
+}
+
+void ABaseVehicle::LeaveVehicle()
+{
+	GetVehicleMovementComponent()->SetThrottleInput(0);
+	CurrentCharacter->AttachToComponent(GetMesh(),FAttachmentTransformRules::SnapToTargetNotIncludingScale , TEXT("CharacterQuit"));
+	CurrentCharacter->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+	CurrentCharacter->SetIsDriving(false);
+	CurrentCharacter->GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	auto Rotation = CurrentCharacter->GetActorRotation();
+	Rotation.Roll = 0.f;
+	CurrentCharacter->SetActorRotation(Rotation);
+	GetController()->Possess(CurrentCharacter);
 }
 
 void ABaseVehicle::UpdateInAirControl(float DeltaTime)

@@ -9,6 +9,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Interactions/Door.h"
+#include "Vehicles/BaseVehicle.h"
 
 // Sets default values
 AMainCharacter::AMainCharacter()
@@ -29,7 +30,6 @@ AMainCharacter::AMainCharacter()
 	SpringArmComponent->SocketOffset.Z = 50.0f;
 	SpringArmComponent->SocketOffset.Y = 30.0f;
 	SpringArmComponent->bUsePawnControlRotation = true;
-	bIsThirdPerson = false;
 
 	// Create camera for 3rd person view
 	CameraComponent3P = CreateDefaultSubobject<UCameraComponent>(TEXT("CameraComp3P"));
@@ -48,14 +48,15 @@ AMainCharacter::AMainCharacter()
 	// Change default movement parameters
 	GetCharacterMovement()->MaxWalkSpeed = MaxSpeedWalk;
 	GetCharacterMovement()->MaxWalkSpeedCrouched = MaxSpeedCrouch;
-	CrouchHold = true;
-	IsCrouching = false;
 
 	// On the beginning our character has default amount of health
 	Health = DefaultHealth;
 
 	GetCapsuleComponent()->OnComponentBeginOverlap.AddDynamic(this, &AMainCharacter::OnOverlapBegin);
 	GetCapsuleComponent()->OnComponentEndOverlap.AddDynamic(this, &AMainCharacter::OnOverlapEnd);
+
+	GetCapsuleComponent()->SetCollisionResponseToChannel(ECollisionChannel::ECC_Camera, ECollisionResponse::ECR_Overlap);
+	GetMesh()->SetCollisionResponseToChannel(ECollisionChannel::ECC_Camera, ECollisionResponse::ECR_Overlap);
 }
 
 // Called to bind functionality to input
@@ -110,7 +111,22 @@ void AMainCharacter::Interact()
 		FVector ForwardVector = GetCapsuleComponent()->GetForwardVector();
 		CurrentDoor->ToggleDoor(ForwardVector);
 	}
+
+	// If we can get current vehicle - interact with it
+	if(CurrentVehicle)
+	{
+		GetToVehicle();
+	}
 }
+
+void AMainCharacter::GetToVehicle()
+{
+	SetIsDriving(true);
+	AttachToComponent(CurrentVehicle->GetMesh(),FAttachmentTransformRules::SnapToTargetNotIncludingScale , TEXT("CharacterSit"));
+	GetController()->Possess(CurrentVehicle);
+	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+}
+
 
 void AMainCharacter::OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
                                     UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep,
@@ -124,17 +140,23 @@ void AMainCharacter::OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor*
 
 		CurrentDoor = Cast<ADoor>(OtherActor);
 	}
+
+	// If we overlap vehicle access radius - save it like current vehicle
+	if (OtherActor != nullptr && OtherActor != this && OtherComp != nullptr && OtherActor->GetClass()->IsChildOf(
+		ABaseVehicle::StaticClass()))
+	{
+		CurrentVehicle = Cast<ABaseVehicle>(OtherActor);
+	}
 }
 
 void AMainCharacter::OnOverlapEnd(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
                                   UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
 {
-	// On quiting access radius - delete current door 
+	// On quiting access radius - delete current door and vehicle 
 	if (OtherActor != nullptr && OtherActor != this && OtherComp != nullptr)
 	{
-		// if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Yellow, TEXT("Came from door!"));
-
 		CurrentDoor = nullptr;
+		CurrentVehicle = nullptr;
 	}
 }
 
