@@ -48,11 +48,6 @@ public:
 	void OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
 						UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep,
 						const FHitResult& SweepResult);
-
-	UFUNCTION()
-	void OnOverlapEnd(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
-					  UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
-
 protected:
 	// Functions for movement
 	void MoveForward(float Value);
@@ -69,7 +64,7 @@ protected:
 	// Update air physics in air
 	void UpdateInAirControl(float DeltaTime);
 
-	// Function to get in/out to/from vehicle
+	// Function to get out of vehicle
 	void LeaveVehicle();
 
 	// Controller of vehicle

@@ -10,6 +10,10 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "Interactions/Door.h"
 #include "Vehicles/BaseVehicle.h"
+#include "BuildingSystem/BaseBuilding.h"
+#include "Components/AudioComponent.h"
+#include "PhysicsEngine/PhysicsHandleComponent.h"
+#include "PortalRoom/PortalCube.h"
 
 // Sets default values
 AMainCharacter::AMainCharacter()
@@ -45,6 +49,15 @@ AMainCharacter::AMainCharacter()
 	CameraComponent1P->SetAutoActivate(true);
 	CameraComponent1P->bUsePawnControlRotation = true;
 
+	PhysicsHandle = CreateDefaultSubobject<UPhysicsHandleComponent>(TEXT("PhysicsHandle"));
+
+	GrabSound = CreateDefaultSubobject<UAudioComponent>(TEXT("GrabSound"));
+	GrabSound->SetupAttachment(RootComponent);
+
+	WrongGrabSound = CreateDefaultSubobject<UAudioComponent>(TEXT("WrongGrabSound"));
+	WrongGrabSound->SetupAttachment(RootComponent);
+
+
 	// Change default movement parameters
 	GetCharacterMovement()->MaxWalkSpeed = MaxSpeedWalk;
 	GetCharacterMovement()->MaxWalkSpeedCrouched = MaxSpeedCrouch;
@@ -52,10 +65,13 @@ AMainCharacter::AMainCharacter()
 	// On the beginning our character has default amount of health
 	Health = DefaultHealth;
 
+	// Overlap notifies for vehicles and door
 	GetCapsuleComponent()->OnComponentBeginOverlap.AddDynamic(this, &AMainCharacter::OnOverlapBegin);
 	GetCapsuleComponent()->OnComponentEndOverlap.AddDynamic(this, &AMainCharacter::OnOverlapEnd);
 
-	GetCapsuleComponent()->SetCollisionResponseToChannel(ECollisionChannel::ECC_Camera, ECollisionResponse::ECR_Overlap);
+	// Fix camera in vehicle
+	GetCapsuleComponent()->
+		SetCollisionResponseToChannel(ECollisionChannel::ECC_Camera, ECollisionResponse::ECR_Overlap);
 	GetMesh()->SetCollisionResponseToChannel(ECollisionChannel::ECC_Camera, ECollisionResponse::ECR_Overlap);
 }
 
@@ -73,8 +89,8 @@ void AMainCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
 	PlayerInputComponent->BindAction("Run", IE_Released, this, &AMainCharacter::OnStopRunning);
 
 	// Bind view rotation for mouse
-	PlayerInputComponent->BindAxis("Turn", this, &APawn::AddControllerYawInput);
-	PlayerInputComponent->BindAxis("LookUp", this, &APawn::AddControllerPitchInput);
+	PlayerInputComponent->BindAxis("Turn", this, &AMainCharacter::Turn);
+	PlayerInputComponent->BindAxis("LookUp", this, &AMainCharacter::LookUp);
 
 	// Bind view rotation for joystick
 	PlayerInputComponent->BindAxis("TurnRate", this, &AMainCharacter::TurnAtRate);
@@ -86,6 +102,9 @@ void AMainCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
 
 	// Bind for interaction with world
 	PlayerInputComponent->BindAction("Interact", IE_Pressed, this, &AMainCharacter::Interact);
+
+	// Bind for breaking built block
+	PlayerInputComponent->BindAction("DestroyInstance", IE_Pressed, this, &AMainCharacter::DestroyInstance);
 
 	// Bind jump event
 	PlayerInputComponent->BindAction("Jump", IE_Pressed, this, &ACharacter::Jump);
@@ -110,21 +129,73 @@ void AMainCharacter::Interact()
 	{
 		FVector ForwardVector = GetCapsuleComponent()->GetForwardVector();
 		CurrentDoor->ToggleDoor(ForwardVector);
+		return;
 	}
 
 	// If we can get current vehicle - interact with it
-	if(CurrentVehicle)
+	if (CurrentVehicle)
 	{
 		GetToVehicle();
+		return;
 	}
+
+	FHitResult Hit;
+	const auto CameraLocation = CameraComponent1P->GetComponentLocation(); // CameraLocation = TraceStart
+	auto ForwardVector = CameraComponent1P->GetForwardVector();
+	const auto TraceEnd = CameraLocation + ForwardVector * GrabDistance;
+
+
+	bool IsHit = GetWorld()->LineTraceSingleByChannel(Hit, CameraLocation, TraceEnd, ECC_Visibility);
+	if (!IsHit)
+	{
+		WrongGrabSound->Play();
+		return;
+	}
+
+	ToggleGrab(Hit);
 }
+
+void AMainCharacter::ToggleGrab(FHitResult& Hit)
+{
+	if (IsGrabbing)
+	{
+		PhysicsHandle->ReleaseComponent();
+	}
+	else
+	{
+		const auto GrabLocation = Hit.GetComponent()->GetComponentLocation();
+		PhysicsHandle->GrabComponentAtLocation(Hit.GetComponent(), NAME_None, GrabLocation);
+		GrabSound->Play();
+	}
+
+	IsGrabbing = !IsGrabbing;
+}
+
 
 void AMainCharacter::GetToVehicle()
 {
 	SetIsDriving(true);
-	AttachToComponent(CurrentVehicle->GetMesh(),FAttachmentTransformRules::SnapToTargetNotIncludingScale , TEXT("CharacterSit"));
+	AttachToComponent(CurrentVehicle->GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale,
+	                  TEXT("CharacterSit"));
 	GetController()->Possess(CurrentVehicle);
 	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+}
+
+void AMainCharacter::DestroyInstance()
+{
+	const auto CameraLocation = CameraComponent1P->GetComponentLocation(); // CameraLocation = TraceStart
+	const auto ForwardVector = CameraComponent1P->GetForwardVector();
+	const auto TraceEnd = CameraLocation + ForwardVector * DestroyDistance;
+
+	FHitResult Hit;
+
+	bool IsHit = GetWorld()->LineTraceSingleByChannel(Hit, CameraLocation, TraceEnd, ECC_Visibility);
+	if (!IsHit) return;
+
+	const auto CurrentBuilding = Cast<ABaseBuilding>(Hit.Actor);
+	if (!CurrentBuilding) return;
+
+	CurrentBuilding->DestroyInstance(Hit.ImpactPoint);
 }
 
 
@@ -143,7 +214,7 @@ void AMainCharacter::OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor*
 
 	// If we overlap vehicle access radius - save it like current vehicle
 	if (OtherActor != nullptr && OtherActor != this && OtherComp != nullptr && OtherActor->GetClass()->IsChildOf(
-		ABaseVehicle::StaticClass()))
+		ABaseVehicle::StaticClass()) && !GetIsDriving())
 	{
 		CurrentVehicle = Cast<ABaseVehicle>(OtherActor);
 	}
@@ -175,6 +246,31 @@ void AMainCharacter::MoveRight(float Value)
 	AddMovementInput(GetActorRightVector(), Value);
 }
 
+void AMainCharacter::Turn(float Value)
+{
+	// Add rotation in that direction
+	AddControllerYawInput(Value);
+
+	const auto CameraLocation = CameraComponent1P->GetComponentLocation();
+	auto ForwardVector = CameraComponent1P->GetForwardVector();
+	const auto TraceEnd = CameraLocation + ForwardVector * GrabDistance;
+
+	PhysicsHandle->SetTargetLocation(TraceEnd);
+}
+
+void AMainCharacter::LookUp(float Value)
+{
+	// Add rotation in that direction
+	AddControllerPitchInput(Value);
+
+	const auto CameraLocation = CameraComponent1P->GetComponentLocation();
+	auto ForwardVector = CameraComponent1P->GetForwardVector();
+	const auto TraceEnd = CameraLocation + ForwardVector * GrabDistance;
+
+	PhysicsHandle->SetTargetLocation(TraceEnd);
+}
+
+
 void AMainCharacter::OnStartRunning()
 {
 	// Turn flag to true
@@ -198,7 +294,6 @@ bool AMainCharacter::IsRunning() const
 {
 	return WantsToRun && IsMovingForward && !GetVelocity().IsZero();
 }
-
 
 float AMainCharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator,
                                  AActor* DamageCauser)

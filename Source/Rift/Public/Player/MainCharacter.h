@@ -12,6 +12,8 @@ class UCapsuleComponent;
 class UBoxComponent;
 class ADoor;
 class ABaseVehicle;
+class UPhysicsHandleComponent;
+
 
 UCLASS()
 class RIFT_API AMainCharacter : public ACharacter
@@ -41,6 +43,15 @@ public:
 	// Camera for 1st person view
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = Camera)
 	UCameraComponent* CameraComponent1P;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	UPhysicsHandleComponent* PhysicsHandle;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Grab)
+	UAudioComponent* GrabSound;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Grab)
+	UAudioComponent* WrongGrabSound;
 
 	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
@@ -77,6 +88,12 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category=Health)
 	float DefaultHealth = 100.f;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category=Grab)
+	float GrabDistance = 300.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category=Building)
+	float DestroyDistance = 650.f;
+	
 private:
 	// Hold current overlapped door
 	UPROPERTY()
@@ -86,20 +103,37 @@ private:
 	UPROPERTY()
 	ABaseVehicle* CurrentVehicle = nullptr;
 
+	// Speed settings
+	UPROPERTY(EditDefaultsOnly, Category=Speed)
+	float MaxSpeedWalk = 400.f;
+
+	UPROPERTY(EditDefaultsOnly, Category=Speed)
+	float MaxSpeedCrouch = 200.f;
+
+	UPROPERTY(EditDefaultsOnly, Category=Speed)
+	float MaxSpeedRun = 600.f;
+	
+	void DestroyInstance();
+
 	// Interact with door
 	void Interact();
 
 	// Function called on Interact with car
 	void GetToVehicle();
-	
+
 	// Functions for movement
 	void MoveForward(float Value);
 	void MoveRight(float Value);
 
+	void ToggleGrab(FHitResult& Hit);
+	
 	// Functions for running
 	void OnStartRunning();
 	void OnStopRunning();
 
+	void Turn(float Value);
+	void LookUp(float Value);
+	
 	// Functions for camera rotation
 	void TurnAtRate(float Rate);
 	void LookUpAtRate(float Rate);
@@ -117,7 +151,7 @@ private:
 	// Take damage to actor
 	virtual float TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator,
 	                         AActor* DamageCauser) override;
-
+	
 
 	// Variables for activating running
 	bool WantsToRun = false;
@@ -126,15 +160,7 @@ private:
 	// Variable for driving animation
 	bool IsDriving = false;
 
-	// Speed settings
-	UPROPERTY(EditDefaultsOnly, Category=Speed)
-	float MaxSpeedWalk = 400.f;
-
-	UPROPERTY(EditDefaultsOnly, Category=Speed)
-	float MaxSpeedCrouch = 200.f;
-
-	UPROPERTY(EditDefaultsOnly, Category=Speed)
-	float MaxSpeedRun = 600.f;
+	bool IsGrabbing = false;
 
 	// Variable for toggle crouch mode
 	bool IsCrouching = false;

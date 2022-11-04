@@ -72,14 +72,14 @@ ABaseVehicle::ABaseVehicle()
 	InteractCollision->SetRelativeLocation(FVector(0.f,0.f,70.f));
 
 	InteractCollision->OnComponentBeginOverlap.AddDynamic(this, &ABaseVehicle::OnOverlapBegin);
-	InteractCollision->OnComponentEndOverlap.AddDynamic(this, &ABaseVehicle::OnOverlapEnd);
 }
 
 void ABaseVehicle::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	UpdateInAirControl(DeltaTime);
+	// Currently Disabled
+	//UpdateInAirControl(DeltaTime);
 }
 
 void ABaseVehicle::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -110,17 +110,6 @@ void ABaseVehicle::OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* O
 		if(GEngine) GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Yellow, TEXT("Someone went to car!"));
 
 		CurrentCharacter = Cast<AMainCharacter>(OtherActor);
-	}
-}
-
-void ABaseVehicle::OnOverlapEnd(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
-{
-	// On quiting access radius - delete current character 
-	if (OtherActor != nullptr && OtherActor != this && OtherComp != nullptr)
-	{
-		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Yellow, TEXT("Someone went from car"));
-
-		CurrentCharacter = nullptr;
 	}
 }
 
@@ -171,39 +160,40 @@ void ABaseVehicle::LeaveVehicle()
 	GetController()->Possess(CurrentCharacter);
 }
 
-void ABaseVehicle::UpdateInAirControl(float DeltaTime)
-{
-	if(Vehicle4W)
-	{
-		FCollisionQueryParams QueryParams;
-		QueryParams.AddIgnoredActor(this);
-
-		const FVector TraceStart = GetActorLocation() + FVector(0.f,0.f,50.f);
-		const FVector TraceEnd = GetActorLocation() - FVector(0.f,0.f,200.f);
-
-		FHitResult Hit;
-
-		// Check if car is in air and is it flipped on its side
-		const bool bInAir = !GetWorld()->LineTraceSingleByChannel(Hit, TraceStart, TraceEnd, ECC_Visibility, QueryParams);
-		const bool bNotGrounded = FVector::DotProduct(GetActorUpVector(), FVector::UpVector) < 0.1f;
-
-		// Is car is in air allow air movement
-		if(bInAir || bNotGrounded)
-		{
-			const float ForwardInput = InputComponent->GetAxisValue("MoveForward");
-			const float RightInput = InputComponent->GetAxisValue("MoveRight");
-
-			// If car is grounded allow to roll car
-			const float AirMovementForcePitch = 3.f;
-			const float AirMovementForceRoll = !bInAir && bNotGrounded ? 20.f : 3.f;
-
-			if(UPrimitiveComponent* VehicleMesh = Vehicle4W->UpdatedPrimitive)
-			{
-				const FVector MovementVector = FVector(RightInput * -AirMovementForceRoll, ForwardInput*AirMovementForcePitch, 0.f) * DeltaTime * Force;
-				const FVector NewAngularMovement = GetActorRotation().RotateVector(MovementVector);
-
-				VehicleMesh->SetPhysicsAngularVelocity(NewAngularMovement, true);
-			}
-		}
-	}
-}
+// DISABLED. CAUSE A LOT OF BUGS AND CRUSHES
+// void ABaseVehicle::UpdateInAirControl(float DeltaTime)
+// {
+// 	if(Vehicle4W)
+// 	{
+// 		FCollisionQueryParams QueryParams;
+// 		QueryParams.AddIgnoredActor(this);
+//
+// 		const FVector TraceStart = GetActorLocation() + FVector(0.f,0.f,50.f);
+// 		const FVector TraceEnd = GetActorLocation() - FVector(0.f,0.f,200.f);
+//
+// 		FHitResult Hit;
+//
+// 		// Check if car is in air and is it flipped on its side
+// 		const bool bInAir = !GetWorld()->LineTraceSingleByChannel(Hit, TraceStart, TraceEnd, ECC_Visibility, QueryParams);
+// 		const bool bNotGrounded = FVector::DotProduct(GetActorUpVector(), FVector::UpVector) < 0.1f;
+//
+// 		// Is car is in air allow air movement
+// 		if(bInAir || bNotGrounded)
+// 		{
+// 			const float ForwardInput = InputComponent->GetAxisValue("MoveForward");
+// 			const float RightInput = InputComponent->GetAxisValue("MoveRight");
+//
+// 			// If car is grounded allow to roll car
+// 			const float AirMovementForcePitch = 3.f;
+// 			const float AirMovementForceRoll = !bInAir && bNotGrounded ? 20.f : 3.f;
+//
+// 			if(UPrimitiveComponent* VehicleMesh = Vehicle4W->UpdatedPrimitive)
+// 			{
+// 				const FVector MovementVector = FVector(RightInput * -AirMovementForceRoll, ForwardInput*AirMovementForcePitch, 0.f) * DeltaTime * Force;
+// 				const FVector NewAngularMovement = GetActorRotation().RotateVector(MovementVector);
+//
+// 				VehicleMesh->SetPhysicsAngularVelocity(NewAngularMovement, true);
+// 			}
+// 		}
+// 	}
+// }
