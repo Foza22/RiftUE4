@@ -54,10 +54,10 @@ protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = ButtonPress)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = ButtonPress)
 	float ButtonMovementSpeed = 15.f;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = ButtonPress)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = ButtonPress)
 	float ButtonPressedLocation = -15.f;
 
 private:

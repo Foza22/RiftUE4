@@ -2,6 +2,9 @@
 
 
 #include "Player/MainCharacter.h"
+
+#include "DrawDebugHelpers.h"
+#include "AnimNodes/AnimNode_RandomPlayer.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/InputComponent.h"
@@ -11,15 +14,16 @@
 #include "Interactions/Door.h"
 #include "Vehicles/BaseVehicle.h"
 #include "BuildingSystem/BaseBuilding.h"
-#include "Components/AudioComponent.h"
+#include "BuildingSystem/BuildingVisual.h"
 #include "PhysicsEngine/PhysicsHandleComponent.h"
 #include "PortalRoom/PortalCube.h"
+#include "Weapon/BaseWeapon.h"
 
 // Sets default values
 AMainCharacter::AMainCharacter()
 {
 	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = false;
+	PrimaryActorTick.bCanEverTick = true;
 
 	// Set our turn rates for input
 	BaseTurnRate = 45.f;
@@ -31,13 +35,12 @@ AMainCharacter::AMainCharacter()
 	SpringArmComponent->SetRelativeRotation(FRotator(0.f, 90.f, 0.f));
 	SpringArmComponent->SetRelativeLocation(FVector(10.f, 0.f, 70.f));
 	SpringArmComponent->TargetArmLength = 250;
-	SpringArmComponent->SocketOffset.Z = 50.0f;
+	SpringArmComponent->SocketOffset.Z = 20.0f;
 	SpringArmComponent->SocketOffset.Y = 30.0f;
 	SpringArmComponent->bUsePawnControlRotation = true;
 
 	// Create camera for 3rd person view
 	CameraComponent3P = CreateDefaultSubobject<UCameraComponent>(TEXT("CameraComp3P"));
-	CameraComponent3P->SetRelativeRotation(FRotator(-10.f, 0.f, 0.f));
 	CameraComponent3P->SetupAttachment(SpringArmComponent);
 	CameraComponent3P->SetAutoActivate(false);
 
@@ -51,19 +54,9 @@ AMainCharacter::AMainCharacter()
 
 	PhysicsHandle = CreateDefaultSubobject<UPhysicsHandleComponent>(TEXT("PhysicsHandle"));
 
-	GrabSound = CreateDefaultSubobject<UAudioComponent>(TEXT("GrabSound"));
-	GrabSound->SetupAttachment(RootComponent);
-
-	WrongGrabSound = CreateDefaultSubobject<UAudioComponent>(TEXT("WrongGrabSound"));
-	WrongGrabSound->SetupAttachment(RootComponent);
-
-
 	// Change default movement parameters
 	GetCharacterMovement()->MaxWalkSpeed = MaxSpeedWalk;
 	GetCharacterMovement()->MaxWalkSpeedCrouched = MaxSpeedCrouch;
-
-	// On the beginning our character has default amount of health
-	Health = DefaultHealth;
 
 	// Overlap notifies for vehicles and door
 	GetCapsuleComponent()->OnComponentBeginOverlap.AddDynamic(this, &AMainCharacter::OnOverlapBegin);
@@ -73,6 +66,36 @@ AMainCharacter::AMainCharacter()
 	GetCapsuleComponent()->
 		SetCollisionResponseToChannel(ECollisionChannel::ECC_Camera, ECollisionResponse::ECR_Overlap);
 	GetMesh()->SetCollisionResponseToChannel(ECollisionChannel::ECC_Camera, ECollisionResponse::ECR_Overlap);
+
+	// On the beginning our character has default amount of health
+	Health = DefaultHealth;
+
+	bInBuildMode = false;
+
+	CurrentCamera = CameraComponent1P;
+}
+
+void AMainCharacter::BeginPlay()
+{
+	Super::BeginPlay();
+	if (BuildingClass)
+	{
+		Builder = GetWorld()->SpawnActor<ABuildingVisual>(BuildingClass);
+	}
+}
+
+
+void AMainCharacter::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+
+	if (bInBuildMode && Builder)
+	{
+		FHitResult HitResult;
+		PerformLineTrace(HitResult, BuildDestroyDistance, false);
+		const FRotator BuildingRotation = GetActorRotation();
+		Builder->SetBuildPosition(HitResult, BuildingRotation);
+	}
 }
 
 // Called to bind functionality to input
@@ -103,7 +126,19 @@ void AMainCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
 	// Bind for interaction with world
 	PlayerInputComponent->BindAction("Interact", IE_Pressed, this, &AMainCharacter::Interact);
 
+
+	PlayerInputComponent->BindAction("ToggleBuildMode", IE_Pressed, this, &AMainCharacter::ToggleBuildMode);
+
+	// Bind action for shooting
+	PlayerInputComponent->BindAction("Fire", IE_Pressed, this, &AMainCharacter::StartFire);
+	PlayerInputComponent->BindAction("Fire", IE_Released, this, &AMainCharacter::StopFire);
+
+	// Bind action for reloading
+	PlayerInputComponent->BindAction("ReloadWeapon", IE_Pressed, this, &AMainCharacter::ReloadWeapon);
+
 	// Bind for breaking built block
+	PlayerInputComponent->BindAction("SpawnBuilding", IE_Pressed, this, &AMainCharacter::SpawnBuilding);
+	PlayerInputComponent->BindAction("CycleBuildingMesh", IE_Pressed, this, &AMainCharacter::CycleBuildingMesh);
 	PlayerInputComponent->BindAction("DestroyInstance", IE_Pressed, this, &AMainCharacter::DestroyInstance);
 
 	// Bind jump event
@@ -127,7 +162,7 @@ void AMainCharacter::Interact()
 	// If we can get current door - we interact with it
 	if (CurrentDoor)
 	{
-		FVector ForwardVector = GetCapsuleComponent()->GetForwardVector();
+		const FVector ForwardVector = GetCapsuleComponent()->GetForwardVector();
 		CurrentDoor->ToggleDoor(ForwardVector);
 		return;
 	}
@@ -140,22 +175,66 @@ void AMainCharacter::Interact()
 	}
 
 	FHitResult Hit;
-	const auto CameraLocation = CameraComponent1P->GetComponentLocation(); // CameraLocation = TraceStart
-	auto ForwardVector = CameraComponent1P->GetForwardVector();
+	const auto CameraLocation = CurrentCamera->GetComponentLocation(); // CameraLocation = TraceStart
+	const auto ForwardVector = CurrentCamera->GetForwardVector();
 	const auto TraceEnd = CameraLocation + ForwardVector * GrabDistance;
 
+	const bool IsHit = GetWorld()->LineTraceSingleByChannel(Hit, CameraLocation, TraceEnd, ECC_Visibility);
+	if (!IsHit) return;
 
-	bool IsHit = GetWorld()->LineTraceSingleByChannel(Hit, CameraLocation, TraceEnd, ECC_Visibility);
-	if (!IsHit)
+	const auto HitActor = Hit.GetActor()->GetClass();
+
+	if (HitActor->IsChildOf(APortalCube::StaticClass()))
 	{
-		WrongGrabSound->Play();
+		ToggleGrab(Hit);
 		return;
 	}
 
-	ToggleGrab(Hit);
+	if (HitActor->IsChildOf(ABaseWeapon::StaticClass()))
+	{
+		PickupWeapon(Hit);
+		return;
+	}
 }
 
-void AMainCharacter::ToggleGrab(FHitResult& Hit)
+void AMainCharacter::PickupWeapon(const FHitResult& Hit)
+{
+	UE_LOG(LogTemp, Display, TEXT("TOOK"));
+
+	CurrentWeapon = Cast<ABaseWeapon>(Hit.GetActor());
+	if (!CurrentWeapon) return;
+
+	const FAttachmentTransformRules AttachmentRules(EAttachmentRule::SnapToTarget, false);
+	CurrentWeapon->AttachToComponent(GetMesh(), AttachmentRules, "WeaponSocket");
+	CurrentWeapon->SetOwner(this);
+	CurrentWeapon->OnEquip();
+	IsWearingWeapon = true;
+	CurrentWeapon->bCanFire = true;
+}
+
+void AMainCharacter::StartFire()
+{
+	if (bInBuildMode || !CurrentWeapon) return;
+
+	CurrentWeapon->StartFire();
+}
+
+void AMainCharacter::StopFire()
+{
+	if (!CurrentWeapon) return;
+
+	CurrentWeapon->StopFire();
+}
+
+void AMainCharacter::ReloadWeapon()
+{
+	// Get access to BaseWeapon and start reload
+	if (!CurrentWeapon) return;
+
+	CurrentWeapon->StartReload();
+}
+
+void AMainCharacter::ToggleGrab(const FHitResult& Hit)
 {
 	if (IsGrabbing)
 	{
@@ -165,7 +244,6 @@ void AMainCharacter::ToggleGrab(FHitResult& Hit)
 	{
 		const auto GrabLocation = Hit.GetComponent()->GetComponentLocation();
 		PhysicsHandle->GrabComponentAtLocation(Hit.GetComponent(), NAME_None, GrabLocation);
-		GrabSound->Play();
 	}
 
 	IsGrabbing = !IsGrabbing;
@@ -181,23 +259,64 @@ void AMainCharacter::GetToVehicle()
 	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 }
 
+void AMainCharacter::PerformLineTrace(FHitResult& HitResult, float Distance, bool DrawDebug) const
+{
+	const FVector TraceStart = CurrentCamera->GetComponentLocation();
+	const FVector TraceEnd = TraceStart + CurrentCamera->GetForwardVector() * Distance;
+
+	FCollisionQueryParams Params;
+	Params.AddIgnoredActor(this);
+
+	const bool IsHit = GetWorld()->LineTraceSingleByChannel(HitResult, TraceStart, TraceEnd, ECC_Visibility, Params);
+	if (DrawDebug)
+	{
+		DrawDebugLine(GetWorld(), TraceStart, TraceEnd, FColor::Blue, false, 3.f);
+	}
+}
+
+void AMainCharacter::ToggleBuildMode()
+{
+	SetBuildMode(!GetBuildMode());
+}
+
+void AMainCharacter::SetBuildMode(bool Enabled)
+{
+	if (!Builder) return;
+	bInBuildMode = Enabled;
+
+	Builder->SetActorHiddenInGame(!bInBuildMode);
+}
+
+void AMainCharacter::SpawnBuilding()
+{
+	if (!bInBuildMode || !Builder) return;
+
+	Builder->SpawnBuilding();
+}
+
+void AMainCharacter::CycleBuildingMesh()
+{
+	if (!Builder || !bInBuildMode) return;
+
+	Builder->CycleMesh();
+}
+
 void AMainCharacter::DestroyInstance()
 {
-	const auto CameraLocation = CameraComponent1P->GetComponentLocation(); // CameraLocation = TraceStart
-	const auto ForwardVector = CameraComponent1P->GetForwardVector();
-	const auto TraceEnd = CameraLocation + ForwardVector * DestroyDistance;
-
 	FHitResult Hit;
+	const auto TraceStart = CurrentCamera->GetComponentLocation(); // CameraLocation = TraceStart
+	const auto ForwardVector = CurrentCamera->GetForwardVector();
+	const auto TraceEnd = TraceStart + ForwardVector * BuildDestroyDistance;
 
-	bool IsHit = GetWorld()->LineTraceSingleByChannel(Hit, CameraLocation, TraceEnd, ECC_Visibility);
+	DrawDebugLine(GetWorld(), TraceStart, TraceEnd, FColor::Red, false, 5.f);
+	const bool IsHit = GetWorld()->LineTraceSingleByChannel(Hit, TraceStart, TraceEnd, ECC_Visibility);
 	if (!IsHit) return;
 
-	const auto CurrentBuilding = Cast<ABaseBuilding>(Hit.Actor);
+	const auto CurrentBuilding = Cast<ABaseBuilding>(Hit.GetActor());
 	if (!CurrentBuilding) return;
 
 	CurrentBuilding->DestroyInstance(Hit.ImpactPoint);
 }
-
 
 void AMainCharacter::OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
                                     UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep,
@@ -251,8 +370,10 @@ void AMainCharacter::Turn(float Value)
 	// Add rotation in that direction
 	AddControllerYawInput(Value);
 
-	const auto CameraLocation = CameraComponent1P->GetComponentLocation();
-	auto ForwardVector = CameraComponent1P->GetForwardVector();
+	if (!IsGrabbing) return;
+
+	const auto CameraLocation = CurrentCamera->GetComponentLocation();
+	const auto ForwardVector = CurrentCamera->GetForwardVector();
 	const auto TraceEnd = CameraLocation + ForwardVector * GrabDistance;
 
 	PhysicsHandle->SetTargetLocation(TraceEnd);
@@ -263,8 +384,10 @@ void AMainCharacter::LookUp(float Value)
 	// Add rotation in that direction
 	AddControllerPitchInput(Value);
 
-	const auto CameraLocation = CameraComponent1P->GetComponentLocation();
-	auto ForwardVector = CameraComponent1P->GetForwardVector();
+	if (!IsGrabbing) return;
+
+	const auto CameraLocation = CurrentCamera->GetComponentLocation();
+	const auto ForwardVector = CurrentCamera->GetForwardVector();
 	const auto TraceEnd = CameraLocation + ForwardVector * GrabDistance;
 
 	PhysicsHandle->SetTargetLocation(TraceEnd);
@@ -362,6 +485,7 @@ void AMainCharacter::ToggleCameraView()
 		// Change our settings for first view
 		CameraComponent3P->SetActive(false);
 		CameraComponent1P->SetActive(true);
+		SetCurrentCamera(CameraComponent1P);
 		// Set our flag to first view after changes
 		bIsThirdPerson = false;
 	}
@@ -370,6 +494,7 @@ void AMainCharacter::ToggleCameraView()
 		// Change our settings to default
 		CameraComponent1P->SetActive(false);
 		CameraComponent3P->SetActive(true);
+		SetCurrentCamera(CameraComponent3P);
 		// Set our flag to third view after changes
 		bIsThirdPerson = true;
 	}

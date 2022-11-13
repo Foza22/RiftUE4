@@ -12,7 +12,9 @@ class RIFT_API ARiftHUD : public AHUD
 	GENERATED_BODY()
 
 public:
-	ARiftHUD();
-	
-	//virtual void DrawHUD() override;
+	virtual void DrawHUD() override;
+
+private:
+	// Crosshair asset pointer
+	void DrawCrosshair();
 };

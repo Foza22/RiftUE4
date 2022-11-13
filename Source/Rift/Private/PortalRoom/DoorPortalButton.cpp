@@ -2,10 +2,8 @@
 
 
 #include "PortalRoom/DoorPortalButton.h"
-
 #include "Components/AudioComponent.h"
 #include "PortalRoom/PortalDoor.h"
-#include "Components/PointLightComponent.h"
 
 // Sets default values
 ADoorPortalButton::ADoorPortalButton()
@@ -25,14 +23,6 @@ ADoorPortalButton::ADoorPortalButton()
 	CylinderCollision->SetRelativeScale3D(FVector(1.4f, 1.4f, 0.03f));
 	CylinderCollision->SetCollisionProfileName(TEXT("OverlapAllDynamic"));
 	CylinderCollision->SetHiddenInGame(true);
-
-	// ButtonLightning = CreateDefaultSubobject<UPointLightComponent>(TEXT("ButtonLightning"));
-	// ButtonLightning->SetupAttachment(ButtonBase);
-	// ButtonLightning->SetMobility(EComponentMobility::Movable);
-	// ButtonLightning->SetIntensity(100'000.f);
-	// ButtonLightning->AttenuationRadius = 110.f;
-	// ButtonLightning->SetRelativeLocation(FVector(0.f, 0.f, 25.f));
-	// ButtonLightning->LightColor = FColor::Red;
 
 	ButtonSound = CreateDefaultSubobject<UAudioComponent>(TEXT("ButtonSound"));
 	ButtonSound->SetAutoActivate(false);
@@ -102,12 +92,12 @@ void ADoorPortalButton::PressButton(float DeltaTime)
 		IsPressed = false;
 		IsReleased = false;
 		ButtonSound->Play();
-		Door->OpenDoor();
+		Door->OpenSound->Play();
 	}
-
 	else if (IsPressed)
 	{
 		Button->SetRelativeLocation(FVector(0.f, 0.f, NewLocation));
+		Door->OpenDoor(NewLocation);
 	}
 }
 
@@ -126,5 +116,6 @@ void ADoorPortalButton::ReleaseButton(float DeltaTime)
 	else if (IsReleased)
 	{
 		Button->SetRelativeLocation(FVector(0.f, 0.f, NewLocation));
+		Door->CloseDoor(NewLocation);
 	}
 }

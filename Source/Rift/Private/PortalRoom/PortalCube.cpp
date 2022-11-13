@@ -12,7 +12,7 @@ APortalCube::APortalCube()
 	PortalCube = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("PortalCubeMesh"));
 	PortalCube->SetupAttachment(RootComponent);
 	PortalCube->SetSimulatePhysics(true);
-	PortalCube->SetMassOverrideInKg(NAME_None,800.f);
+	PortalCube->SetMassOverrideInKg(NAME_None,1000.f);
 	PortalCube->SetAngularDamping(10.f);
 }
 

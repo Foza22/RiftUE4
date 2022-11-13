@@ -53,7 +53,7 @@ void ADoor::Tick(float DeltaTime)
 	}
 }
 
-void ADoor::ToggleDoor(FVector& ForwardVector)
+void ADoor::ToggleDoor(const FVector& ForwardVector)
 {
 	// Is door forward vector and character are in the same direction?
 	DotProd = FVector::DotProduct(DoorProxVolume->GetForwardVector(), ForwardVector);
@@ -97,7 +97,7 @@ void ADoor::OpenDoor(float DeltaTime)
 	// Add extra rotation to current rotation 
 	else if (IsOpening)
 	{
-		Door->AddRelativeRotation(FQuat(FRotator(0.f, AddRotation, 0.f)), false, 0, ETeleportType::None);
+		Door->AddRelativeRotation(FQuat(FRotator(0.f, AddRotation, 0.f)), false, nullptr, ETeleportType::None);
 	}
 }
 
@@ -118,6 +118,6 @@ void ADoor::CloseDoor(float DeltaTime)
 	// Add extra rotation to current rotation 
 	else if (IsClosing)
 	{
-		Door->AddRelativeRotation(FQuat(FRotator(0.f, AddRotation, 0.f)), false, 0, ETeleportType::None);
+		Door->AddRelativeRotation(FQuat(FRotator(0.f, AddRotation, 0.f)), false, nullptr, ETeleportType::None);
 	}
 }

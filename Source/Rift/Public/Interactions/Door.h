@@ -44,7 +44,7 @@ public:
 	ADoor();
 
 	// Switch action with door
-	void ToggleDoor(FVector& ForwardVector);
+	void ToggleDoor(const FVector& ForwardVector);
 
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;

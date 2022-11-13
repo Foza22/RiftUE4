@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "Weapon/BaseWeapon.h"
 #include "MainCharacter.generated.h"
 
 class UCameraComponent;
@@ -13,7 +14,7 @@ class UBoxComponent;
 class ADoor;
 class ABaseVehicle;
 class UPhysicsHandleComponent;
-
+class ABuildingVisual;
 
 UCLASS()
 class RIFT_API AMainCharacter : public ACharacter
@@ -47,14 +48,14 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	UPhysicsHandleComponent* PhysicsHandle;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Grab)
-	UAudioComponent* GrabSound;
+	UPROPERTY(EditDefaultsOnly, Category = Building)
+	TSubclassOf<ABuildingVisual> BuildingClass;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Grab)
-	UAudioComponent* WrongGrabSound;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Building)
+	ABuildingVisual* Builder;
 
 	// Called to bind functionality to input
-	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
+	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
 	// Overlap functions
 	UFUNCTION()
@@ -66,6 +67,12 @@ public:
 	void OnOverlapEnd(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
 	                  UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
 
+	UFUNCTION(BlueprintCallable, Category = Camera)
+	UCameraComponent* GetCurrentCamera() const { return CurrentCamera; }
+
+	UFUNCTION(BlueprintCallable, Category = Camera)
+	void SetCurrentCamera(UCameraComponent* Camera) { CurrentCamera = Camera; }
+
 	// Function for activating running animation
 	UFUNCTION(BlueprintCallable, Category = Movement)
 	bool IsRunning() const;
@@ -74,15 +81,47 @@ public:
 	UFUNCTION(BlueprintCallable, Category = Health)
 	float GetHealth() const { return Health; }
 
+	UFUNCTION(BlueprintCallable, Category = Weapon)
+	bool GetIsWearingWeapon() const { return IsWearingWeapon; }
+
+	UFUNCTION(BlueprintCallable, Category = Building)
+	void SetBuildMode(bool Enabled);
+
+	UFUNCTION(BlueprintCallable, Category = Building)
+	bool GetBuildMode() const { return bInBuildMode; }
+
+	UFUNCTION(BlueprintCallable, Category = Building)
+	void SpawnBuilding();
+
+	UFUNCTION(BlueprintCallable, Category = Building)
+	void CycleBuildingMesh();
+	
 	// Functions for Driving Animations
+	UFUNCTION(BlueprintCallable, Category = Building)
 	void SetIsDriving(bool Condition) { IsDriving = Condition; }
+
 	UFUNCTION(BlueprintCallable, Category = Driving)
 	bool GetIsDriving() const { return IsDriving; }
 
+	void PerformLineTrace(FHitResult& HitResult, float Distance = 650.f, bool DrawDebug = false) const;
+
+	virtual void Tick(float DeltaSeconds) override;
+	
 protected:
+	virtual void BeginPlay() override;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Camera)
+	UCameraComponent* CurrentCamera = nullptr;
+
 	// Settings function to change hold/toggle crouch
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Control)
-	bool CrouchHold;
+	bool CrouchHold = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Weapon)
+	bool IsWearingWeapon = false;
+
+	UPROPERTY(BlueprintReadOnly, Category= Building)
+	bool bInBuildMode;
 
 	// Health by default
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category=Health)
@@ -92,8 +131,8 @@ protected:
 	float GrabDistance = 300.f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category=Building)
-	float DestroyDistance = 650.f;
-	
+	float BuildDestroyDistance = 650.f;
+
 private:
 	// Hold current overlapped door
 	UPROPERTY()
@@ -102,6 +141,10 @@ private:
 	// Hold current overlapped car
 	UPROPERTY()
 	ABaseVehicle* CurrentVehicle = nullptr;
+
+	// If weapon created we can shoot
+	UPROPERTY()
+	ABaseWeapon* CurrentWeapon = nullptr;
 
 	// Speed settings
 	UPROPERTY(EditDefaultsOnly, Category=Speed)
@@ -112,7 +155,19 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, Category=Speed)
 	float MaxSpeedRun = 600.f;
-	
+
+	// Function responsible for deleting object from map and adding it to player
+	void PickupWeapon(const FHitResult& Hit);
+
+	// Function for shooting
+	void StartFire();
+	void StopFire();
+
+	// Function for reloading weapon
+	void ReloadWeapon();
+
+	void ToggleBuildMode();
+
 	void DestroyInstance();
 
 	// Interact with door
@@ -125,15 +180,15 @@ private:
 	void MoveForward(float Value);
 	void MoveRight(float Value);
 
-	void ToggleGrab(FHitResult& Hit);
-	
+	void ToggleGrab(const FHitResult& Hit);
+
 	// Functions for running
 	void OnStartRunning();
 	void OnStopRunning();
 
 	void Turn(float Value);
 	void LookUp(float Value);
-	
+
 	// Functions for camera rotation
 	void TurnAtRate(float Rate);
 	void LookUpAtRate(float Rate);
@@ -151,7 +206,7 @@ private:
 	// Take damage to actor
 	virtual float TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator,
 	                         AActor* DamageCauser) override;
-	
+
 
 	// Variables for activating running
 	bool WantsToRun = false;

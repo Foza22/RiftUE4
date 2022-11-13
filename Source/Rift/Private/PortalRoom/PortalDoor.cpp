@@ -3,6 +3,8 @@
 
 #include "PortalRoom/PortalDoor.h"
 
+#include "Components/AudioComponent.h"
+
 // Sets default values
 APortalDoor::APortalDoor()
 {
@@ -11,6 +13,7 @@ APortalDoor::APortalDoor()
 
 	BottomSurface = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BottomSurface"));
 	BottomSurface->SetupAttachment(RootComponent);
+	BottomSurface->SetRelativeScale3D(FVector(2.f,2.f,2.f));
 
 	LeftDoor = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("LeftDoor"));
 	LeftDoor->SetupAttachment(RootComponent);
@@ -20,11 +23,25 @@ APortalDoor::APortalDoor()
 
 	TopSurface = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("TopSurface"));
 	TopSurface->SetupAttachment(RootComponent);
+
+	OpenSound = CreateDefaultSubobject<UAudioComponent>(TEXT("OpenSound"));
+	OpenSound->SetupAttachment(RootComponent);
 }
 
-void APortalDoor::OpenDoor()
+void APortalDoor::OpenDoor(float NewLocation) const
 {
-	UE_LOG(LogTemp, Display, TEXT("OPEN OPEN"));
+	const float Location = NewLocation * DoorSpeed;
+	
+	LeftDoor->SetRelativeLocation(FVector(Location,0.f,0.f));
+	RightDoor->SetRelativeLocation(FVector(-Location,0.f,0.f));
+}
+
+void APortalDoor::CloseDoor(float NewLocation) const
+{
+	const float Location = NewLocation * DoorSpeed;
+	
+	LeftDoor->SetRelativeLocation(FVector(Location,0.f,0.f));
+	RightDoor->SetRelativeLocation(FVector(-Location,0.f,0.f));
 }
 
 
