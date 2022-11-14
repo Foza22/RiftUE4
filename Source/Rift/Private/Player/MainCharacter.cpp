@@ -139,7 +139,7 @@ void AMainCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
 	// Bind for breaking built block
 	PlayerInputComponent->BindAction("SpawnBuilding", IE_Pressed, this, &AMainCharacter::SpawnBuilding);
 	PlayerInputComponent->BindAction("CycleBuildingMesh", IE_Pressed, this, &AMainCharacter::CycleBuildingMesh);
-	PlayerInputComponent->BindAction("DestroyInstance", IE_Pressed, this, &AMainCharacter::DestroyInstance);
+	PlayerInputComponent->BindAction("DestroyInstance", IE_Pressed, this, &AMainCharacter::DestroyBuildingInstance);
 
 	// Bind jump event
 	PlayerInputComponent->BindAction("Jump", IE_Pressed, this, &ACharacter::Jump);
@@ -294,28 +294,22 @@ void AMainCharacter::SpawnBuilding()
 	Builder->SpawnBuilding();
 }
 
+void AMainCharacter::DestroyBuildingInstance()
+{
+	if (!bInBuildMode || !Builder) return;
+
+ 	FHitResult HitResult;
+	PerformLineTrace(HitResult);
+	
+	Builder->DestroyInstance(HitResult);
+}
+
+
 void AMainCharacter::CycleBuildingMesh()
 {
 	if (!Builder || !bInBuildMode) return;
 
 	Builder->CycleMesh();
-}
-
-void AMainCharacter::DestroyInstance()
-{
-	FHitResult Hit;
-	const auto TraceStart = CurrentCamera->GetComponentLocation(); // CameraLocation = TraceStart
-	const auto ForwardVector = CurrentCamera->GetForwardVector();
-	const auto TraceEnd = TraceStart + ForwardVector * BuildDestroyDistance;
-
-	DrawDebugLine(GetWorld(), TraceStart, TraceEnd, FColor::Red, false, 5.f);
-	const bool IsHit = GetWorld()->LineTraceSingleByChannel(Hit, TraceStart, TraceEnd, ECC_Visibility);
-	if (!IsHit) return;
-
-	const auto CurrentBuilding = Cast<ABaseBuilding>(Hit.GetActor());
-	if (!CurrentBuilding) return;
-
-	CurrentBuilding->DestroyInstance(Hit.ImpactPoint);
 }
 
 void AMainCharacter::OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,

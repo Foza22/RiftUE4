@@ -94,6 +94,9 @@ public:
 	void SpawnBuilding();
 
 	UFUNCTION(BlueprintCallable, Category = Building)
+	void DestroyBuildingInstance();
+
+	UFUNCTION(BlueprintCallable, Category = Building)
 	void CycleBuildingMesh();
 	
 	// Functions for Driving Animations
@@ -167,8 +170,6 @@ private:
 	void ReloadWeapon();
 
 	void ToggleBuildMode();
-
-	void DestroyInstance();
 
 	// Interact with door
 	void Interact();

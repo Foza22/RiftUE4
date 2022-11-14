@@ -19,7 +19,7 @@ public:
 	ABaseBuilding();
 
 	UFUNCTION(BlueprintCallable, Category = Building)
-	void DestroyInstance(FVector& HitPoint);
+	void DestroyInstance(const FBuildingSocketData& BuildingSocketData);
 
 	UFUNCTION(BlueprintCallable, Category = Building)
 	FTransform GetSocketTransform(UInstancedStaticMeshComponent* InstancedComponent, int32 InstanceIndex,
@@ -45,7 +45,7 @@ protected:
 
 TArray<FInstanceSocketCheck> InstanceSocketsCheck;
 	
-	bool IsValidSocket(UInstancedStaticMeshComponent* HitComponent, const FName& SocketName,const FName& Filter) const;
+	bool IsValidSocket(UInstancedStaticMeshComponent* HitComponent, int32 HitIndex,const FName& SocketName,const FName& Filter) const;
 	
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;

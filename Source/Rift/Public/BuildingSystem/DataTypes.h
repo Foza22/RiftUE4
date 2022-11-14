@@ -44,7 +44,7 @@ struct FSocketInformation
 {
 	GENERATED_BODY()
 
-	FString SocketName;
+	FName SocketName;
 	bool bSocketInUse = false;
 };
 

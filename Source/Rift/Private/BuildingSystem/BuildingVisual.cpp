@@ -19,9 +19,6 @@ ABuildingVisual::ABuildingVisual()
 	BuildingTypeIndex = 0;
 	bMaterialIsTrue = false;
 	bReturnedMesh = true;
-
-	BuildMesh->OnComponentBeginOverlap.AddDynamic(this, &ABuildingVisual::OnOverlapBegin);
-	BuildMesh->OnComponentEndOverlap.AddDynamic(this, &ABuildingVisual::OnOverlapEnd);
 }
 
 // Called when the game starts or when spawned
@@ -135,6 +132,21 @@ void ABuildingVisual::SpawnBuilding()
 	InteractingBuilding->AddInstance(SocketData, BuildingTypes[BuildingTypeIndex].BuildType);
 }
 
+void ABuildingVisual::DestroyInstance(const FHitResult& HitResult)
+{
+	if(!InteractingBuilding) return;
+
+	UInstancedStaticMeshComponent* InstancedStaticMeshComponent = Cast<UInstancedStaticMeshComponent>(HitResult.GetComponent());
+	if(!InstancedStaticMeshComponent) return;
+	
+	FBuildingSocketData BuildingSocketData;
+	BuildingSocketData.InstancedComponent = InstancedStaticMeshComponent;
+	BuildingSocketData.Index = HitResult.Item;
+
+	InteractingBuilding->DestroyInstance(BuildingSocketData);
+}
+
+
 void ABuildingVisual::CycleMesh()
 {
 	if (!bReturnedMesh) return;
@@ -149,22 +161,4 @@ void ABuildingVisual::CycleMesh()
 		BuildMesh->SetStaticMesh(BuildingTypes[BuildingTypeIndex].BuildingMesh);
 	}
 }
-
-void ABuildingVisual::OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
-{
-	if (OtherActor != nullptr && OtherActor != this && OtherComp != nullptr && OtherActor->IsA(ABaseBuilding::StaticClass()))
-	{
-		UE_LOG(LogTemp, Warning, TEXT("YOU CAN NOT BUILD"));
-	}
-}
-
-void ABuildingVisual::OnOverlapEnd(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
-{
-	// On quiting access radius - delete current door and vehicle 
-	if (OtherActor != nullptr && OtherActor != this && OtherComp != nullptr)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("YOU CAN BUILD"));
-	}
-}
-
 
