@@ -6,6 +6,7 @@
 #include "Weapon/BaseWeapon.h"
 #include "AssaultRifle.generated.h"
 
+
 UCLASS()
 class RIFT_API AAssaultRifle : public ABaseWeapon
 {
@@ -13,7 +14,7 @@ class RIFT_API AAssaultRifle : public ABaseWeapon
 
 public:
 	AAssaultRifle();
-	
+
 	virtual void StartFire() override;
 	virtual void StopFire() override;
 
@@ -23,16 +24,16 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = Weapon)
 	float DamageAmount = 10.0f;
-
+	
 	virtual void BeginPlay() override;
 	virtual void MakeShot() override;
-	virtual bool GetTraceData(FVector& TraceStart, FVector& TraceEnd) const override;	
+	
 private:
 	FTimerHandle ShotTimerHandle;
 
 	void MakeDamage(const FHitResult& HitResult);
 
 	AController* GetController() const;
-	
+
 	float TimeBetweenShots;
 };

@@ -133,6 +133,9 @@ void AMainCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
 	PlayerInputComponent->BindAction("Fire", IE_Pressed, this, &AMainCharacter::StartFire);
 	PlayerInputComponent->BindAction("Fire", IE_Released, this, &AMainCharacter::StopFire);
 
+	PlayerInputComponent->BindAction("ToggleAim", IE_Pressed, this, &AMainCharacter::StartAiming);
+	PlayerInputComponent->BindAction("ToggleAim", IE_Released, this, &AMainCharacter::StopAiming);
+
 	// Bind action for reloading
 	PlayerInputComponent->BindAction("ReloadWeapon", IE_Pressed, this, &AMainCharacter::ReloadWeapon);
 
@@ -226,6 +229,20 @@ void AMainCharacter::StopFire()
 	CurrentWeapon->StopFire();
 }
 
+void AMainCharacter::StartAiming()
+{
+	if (!CurrentWeapon) return;
+
+	CurrentWeapon->StartAiming();
+}
+
+void AMainCharacter::StopAiming()
+{
+	if (!CurrentWeapon) return;
+
+	CurrentWeapon->StopAiming();
+}
+
 void AMainCharacter::ReloadWeapon()
 {
 	// Get access to BaseWeapon and start reload
@@ -298,9 +315,9 @@ void AMainCharacter::DestroyBuildingInstance()
 {
 	if (!bInBuildMode || !Builder) return;
 
- 	FHitResult HitResult;
+	FHitResult HitResult;
 	PerformLineTrace(HitResult);
-	
+
 	Builder->DestroyInstance(HitResult);
 }
 

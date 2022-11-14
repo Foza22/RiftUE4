@@ -4,6 +4,7 @@
 #include "Weapon/BaseWeapon.h"
 
 #include "DrawDebugHelpers.h"
+#include "Camera/CameraComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/Controller.h"
@@ -13,7 +14,7 @@
 ABaseWeapon::ABaseWeapon()
 {
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = false;
+	PrimaryActorTick.bCanEverTick = true;
 
 	// Create mesh for weapon
 	// Choose mesh in blueprint
@@ -30,12 +31,38 @@ void ABaseWeapon::BeginPlay()
 	checkf(DefaultAmmo.BulletsAmount > 0, TEXT("Bullets count couldn`t be less or equal zero"));
 	checkf(DefaultAmmo.BulletsTotal > 0, TEXT("Total bullets count couldn`t be less or equal zero"));
 	CurrentAmmo = DefaultAmmo;
+
+	FOnTimelineFloat XRecoilCurve;
+	FOnTimelineFloat YRecoilCurve;
+
+	XRecoilCurve.BindUFunction(this, FName("StartHorizontalRecoil"));
+	YRecoilCurve.BindUFunction(this, FName("StartVerticalRecoil"));
+
+	if(!HorizontalCurve || !VerticalCurve) return;
+	
+	RecoilTimeline.AddInterpFloat(HorizontalCurve, XRecoilCurve);
+	RecoilTimeline.AddInterpFloat(VerticalCurve, YRecoilCurve);
 }
 
+void ABaseWeapon::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+
+	if(RecoilTimeline.IsPlaying())
+	{
+		RecoilTimeline.TickTimeline(DeltaSeconds);
+	}
+
+	if(RecoilTimeline.IsReversing())
+	{
+		RecoilTimeline.TickTimeline(DeltaSeconds);
+	}
+}
 
 void ABaseWeapon::OnEquip()
 {
 	WeaponMesh->SetCollisionProfileName(TEXT("OverlapAllDynamic"));
+	Player = Cast<AMainCharacter>(GetOwner());
 }
 
 void ABaseWeapon::StartFire()
@@ -53,7 +80,7 @@ void ABaseWeapon::MakeShot()
 bool ABaseWeapon::GetPlayerViewPoint(FVector& ViewLocation, FRotator& ViewRotation) const
 {
 	const auto Character = Cast<AMainCharacter>(GetOwner());
-	if (!Character)return false;
+	if (!Character) return false;
 
 	if (Character->IsPlayerControlled())
 	{
@@ -80,8 +107,14 @@ bool ABaseWeapon::GetTraceData(FVector& TraceStart, FVector& TraceEnd) const
 	if (!GetPlayerViewPoint(ViewLocation, ViewRotation)) return false;
 
 	TraceStart = ViewLocation;
-	const FVector ShootDirection = ViewRotation.Vector();
-	TraceEnd = TraceStart + ShootDirection * ShootDistance;
+	TraceEnd = TraceStart + ViewRotation.Vector() * ShootDistance;
+	
+	if(!IsAiming)
+	{
+		TraceEnd.Y += TraceEnd.Y * FMath::RandRange(MinimumNonAimSpread, MaximumNonAimSpread);
+		TraceEnd.Z += TraceEnd.Z * FMath::RandRange(MinimumNonAimSpread, MaximumNonAimSpread);
+	}
+	
 	return true;
 }
 
@@ -102,7 +135,7 @@ void ABaseWeapon::DecreaseAmmo()
 {
 	CurrentAmmo.BulletsAmount--;
 	// Debug log
-	LogAmmo();
+	//LogAmmo();
 
 	// If no ammo in clip and have ammo in stash - start reload
 	if (IsClipEmpty() && !IsAmmoEmpty())
@@ -125,6 +158,7 @@ bool ABaseWeapon::IsClipEmpty() const
 
 void ABaseWeapon::StartReload()
 {
+	StopFire();
 	// If we have bullets in stash start reloading
 	if (CurrentAmmo.BulletsTotal > 0)
 	{
@@ -164,6 +198,40 @@ void ABaseWeapon::ChangeClip()
 	bReloading = false;
 }
 
+void ABaseWeapon::StartHorizontalRecoil(float Value)
+{
+	Player->AddControllerYawInput(Value);
+}
+
+void ABaseWeapon::StartVerticalRecoil(float Value)
+{
+	Player->AddControllerPitchInput(Value);
+}
+
+void ABaseWeapon::StartRecoil()
+{
+	RecoilTimeline.PlayFromStart();
+}
+
+void ABaseWeapon::StopRecoil()
+{
+	RecoilTimeline.Stop();
+}
+
+void ABaseWeapon::StartAiming()
+{
+	// Temporary aim
+	Player->GetCurrentCamera()->SetFieldOfView(50.f);
+	IsAiming = true;
+}
+
+void ABaseWeapon::StopAiming()
+{
+	// Temporary aim
+	Player->GetCurrentCamera()->SetFieldOfView(90.f);
+	IsAiming = false;
+}
+
 // Debug function
 void ABaseWeapon::LogAmmo()
 {
@@ -171,3 +239,4 @@ void ABaseWeapon::LogAmmo()
 	AmmoInfo += FString::FromInt(CurrentAmmo.BulletsTotal);
 	UE_LOG(LogTemp, Display, TEXT("%s"), *AmmoInfo);
 }
+

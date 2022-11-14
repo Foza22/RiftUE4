@@ -4,9 +4,12 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "Components/TimelineComponent.h"
 #include "BaseWeapon.generated.h"
 
 class USkeletalMeshComponent;
+class AMainCharacter;
+class UCurveFloat;
 
 USTRUCT(BlueprintType)
 struct FAmmoData
@@ -59,6 +62,11 @@ public:
 	bool IsClipEmpty() const;
 	void ChangeClip();
 
+	void StartAiming();
+	void StopAiming();
+
+	virtual void Tick(float DeltaSeconds) override;
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -75,10 +83,22 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = Weapon)
 	float ReloadTime = 1.5f;
-	
+
 	// Information about ammo
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = Weapon)
 	FAmmoData DefaultAmmo{30, 120};
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Recoil)
+	UCurveFloat* HorizontalCurve;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Recoil)
+	UCurveFloat* VerticalCurve;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Recoil)
+	float MinimumNonAimSpread = -0.25f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Recoil)
+	float MaximumNonAimSpread = 0.25f;
 
 	bool GetPlayerViewPoint(FVector& ViewLocation, FRotator& ViewRotation) const;
 	FVector GetMuzzleWorldLocation() const;
@@ -88,6 +108,23 @@ protected:
 
 	// Debug function
 	void LogAmmo();
+
+	UPROPERTY()
+	AMainCharacter* Player;
+
+	FTimeline RecoilTimeline;
+
+	UFUNCTION()
+	void StartHorizontalRecoil(float Value);
+
+	UFUNCTION()
+	void StartVerticalRecoil(float Value);
+
+	void StartRecoil();
+
+	void StopRecoil();
+
+	bool IsAiming = false;
 
 private:
 	// Stores current amount of ammo

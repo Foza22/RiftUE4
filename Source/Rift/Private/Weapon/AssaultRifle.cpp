@@ -4,11 +4,11 @@
 #include "Weapon/AssaultRifle.h"
 
 #include "DrawDebugHelpers.h"
-#include "Camera/CameraComponent.h"
 #include "Player/MainCharacter.h"
 
 AAssaultRifle::AAssaultRifle()
 {
+	
 }
 
 void AAssaultRifle::BeginPlay()
@@ -24,18 +24,23 @@ void AAssaultRifle::StartFire()
 
 	GetWorldTimerManager().SetTimer(ShotTimerHandle, this, &AAssaultRifle::MakeShot, TimeBetweenShots, true);
 	MakeShot();
+	StartRecoil();
 }
 
 void AAssaultRifle::StopFire()
 {
 	GetWorldTimerManager().ClearTimer(ShotTimerHandle);
+	StopRecoil();
 }
 
 void AAssaultRifle::MakeShot()
 {
-	if(IsClipEmpty()) return;
+	if(IsClipEmpty())
+	{
+		StopFire();
+		return;
+	}
 	
-	const auto Player = Cast<AMainCharacter>(GetOwner());
 	if (!GetWorld() || Player->IsRunning())
 	{
 		StopFire();
@@ -54,24 +59,11 @@ void AAssaultRifle::MakeShot()
 
 	if (HitResult.bBlockingHit)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("YOU HIT"));
 		DrawDebugSphere(GetWorld(), HitResult.Location, 5.f, 10, FColor::Red, false, 3);
 		MakeDamage(HitResult);
 	}
 
 	DecreaseAmmo();
-}
-
-bool AAssaultRifle::GetTraceData(FVector& TraceStart, FVector& TraceEnd) const
-{
-	FVector ViewLocation;
-	FRotator ViewRotation;
-	if (!GetPlayerViewPoint(ViewLocation, ViewRotation)) return false;
-
-	TraceStart = ViewLocation;
-	const FVector ShootDirection = ViewRotation.Vector();
-	TraceEnd = TraceStart + ShootDirection * ShootDistance;
-	return true;
 }
 
 void AAssaultRifle::MakeDamage(const FHitResult& HitResult)

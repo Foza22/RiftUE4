@@ -98,7 +98,7 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = Building)
 	void CycleBuildingMesh();
-	
+
 	// Functions for Driving Animations
 	UFUNCTION(BlueprintCallable, Category = Building)
 	void SetIsDriving(bool Condition) { IsDriving = Condition; }
@@ -109,7 +109,7 @@ public:
 	void PerformLineTrace(FHitResult& HitResult, float Distance = 650.f, bool DrawDebug = false) const;
 
 	virtual void Tick(float DeltaSeconds) override;
-	
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -166,6 +166,9 @@ private:
 	void StartFire();
 	void StopFire();
 
+	void StartAiming();
+	void StopAiming();
+	
 	// Function for reloading weapon
 	void ReloadWeapon();
 
